@@ -30,7 +30,7 @@
       background-color: var(--bg); 
       color: var(--text); 
       padding: 1.5rem; 
-      padding-bottom: 15rem; /* Espacio extra para desplegables de fechas */
+      padding-bottom: 15rem; 
       max-width: 1400px; 
       margin: 0 auto; 
     }
@@ -60,7 +60,6 @@
       width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: white;
     }
 
-    /* Selector de mes estilizado */
     .month-picker-container {
       display: flex;
       align-items: center;
@@ -101,7 +100,6 @@
     .btn-danger:hover { background: #dc2626; }
     .btn-sm { padding: 0.35rem 0.6rem; font-size: 0.75rem; width: auto; }
 
-    /* Lista de Médicos */
     .doc-item {
       background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
       padding: 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;
@@ -110,18 +108,15 @@
     .doc-info strong { color: var(--secondary); }
     .doc-actions { display: flex; gap: 0.3rem; }
 
-    /* Formulario Checkbox */
     .checkbox-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; font-size: 0.8rem; margin-top: 0.3rem; }
     .checkbox-group label { font-weight: normal; display: flex; align-items: center; gap: 0.3rem; margin: 0; }
 
-    /* Listas genéricas (Ausencias y Feriados) */
     .custom-list { margin-top: 0.8rem; max-height: 150px; overflow-y: auto; }
     .custom-item {
       display: flex; justify-content: space-between; align-items: center;
       background: #f1f5f9; padding: 0.4rem 0.6rem; border-radius: 6px; margin-bottom: 0.4rem; font-size: 0.8rem;
     }
 
-    /* Calendario */
     #calendar-container { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); }
     .calendar-header { text-align: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary); }
     .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
@@ -147,7 +142,6 @@
   </header>
 
   <div class="grid-layout">
-    <!-- PANEL IZQUIERDO DE CONFIGURACIÓN -->
     <div class="controls">
 
       <!-- 1. MES Y ACCIONES PRINCIPALES -->
@@ -184,15 +178,12 @@
       <!-- 3. GESTIÓN DE ASISTENTES -->
       <div class="card">
         <h2><i class="fa-solid fa-user-gear"></i> Gestión de Asistentes</h2>
-        <div id="doctors-list">
-          <!-- Lista dinámica de médicos -->
-        </div>
+        <div id="doctors-list"></div>
 
         <button class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 0.5rem;" onclick="showAddDoctorForm()">
           <i class="fa-solid fa-user-plus"></i> Agregar Nuevo Asistente
         </button>
 
-        <!-- Formulario oculto para crear/editar médico -->
         <div id="doctor-form" style="display: none; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
           <h3 id="form-title" style="font-size: 0.9rem; margin-bottom: 0.5rem;">Editar Asistente</h3>
           <input type="hidden" id="edit-doc-id">
@@ -510,7 +501,7 @@
       });
     }
 
-    // --- VERIFICACIÓN DE DISPONIBILIDAD Y PENALIZACIÓN ---
+    // --- DISPONIBILIDAD DE MÉDICOS ---
     function getAvailability(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
@@ -533,15 +524,15 @@
         }
       }
 
-      // 4. Salida Temprana / Jornada Incompleta
+      // 4. Salida Temprana (se le da penalización suave para preferir jornada completa si es posible)
       if(doc.earlyDay === dayOfWeek && doc.earlyTime) {
-        return { status: 'LIMITADO', penalty: 100, note: `Sale ${doc.earlyTime}` };
+        return { status: 'LIMITADO', penalty: 10, note: `Sale ${doc.earlyTime}` };
       }
 
       return { status: 'DISPONIBLE', penalty: 0, note: '' };
     }
 
-    // --- ALGORITMO DE ASIGNACIÓN MATEMÁTICAMENTE EQUITATIVO ---
+    // --- ALGORITMO DE ASIGNACIÓN ESTRICTO BASADO EN ANTIGÜEDAD Y RESIDUO ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
       if (!monthInput || doctors.length === 0) { return; }
@@ -549,7 +540,7 @@
       const [year, month] = monthInput.split('-').map(Number);
       const lastDay = new Date(year, month, 0);
 
-      // 1. Días laborables reales
+      // 1. Identificar días laborables reales
       let workDays = [];
       let holidayDaysMap = {};
 
@@ -571,26 +562,28 @@
       const totalWorkDays = workDays.length;
       const numDocs = doctors.length;
 
-      // 2. Cálculo estricto de Cuotas Objetivos
+      // 2. FASE 1: CÁLCULO DE CUOTAS LÍMITE INVIOLABLES
+      // Cuota Base = D / N
+      // Residuo R = D % N (se asigna +1 a los R médicos MENOS antiguos)
       const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
       const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
 
-      // Ordenar médicos en orden INVERSO a antigüedad (Rank mayor a menor: #6, #5, #4...)
+      // Ordenar médicos de MENOR antigüedad a MAYOR antigüedad (Rank #6 a Rank #1)
       let docsByRankInverted = [...doctors].sort((a, b) => b.rank - a.rank);
       
-      let targetQuotas = {};
-      doctors.forEach(d => targetQuotas[d.id] = baseQuota);
+      let maxQuotaMap = {};
+      doctors.forEach(d => maxQuotaMap[d.id] = baseQuota);
 
-      // Asignar el residuo (+1 día) a los de menor antigüedad
+      // Asignar los días extra de residuo estrictamente a los menos antiguos
       for (let i = 0; i < remainder; i++) {
-        targetQuotas[docsByRankInverted[i].id] += 1;
+        maxQuotaMap[docsByRankInverted[i].id] += 1;
       }
 
       let counts = {};
       doctors.forEach(d => counts[d.id] = 0);
       let assignments = [];
 
-      // 3. Recorrer los días laborables del mes
+      // 3. FASE 2: ASIGNACIÓN DÍA POR DÍA SIN SUPERAR JAMÁS LA CUOTA MÁXIMA
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const currentDate = new Date(year, month - 1, d);
         const dayOfWeek = currentDate.getDay();
@@ -600,29 +593,27 @@
           if (holidayDaysMap[dateStr]) {
             assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
           } else {
+            // Filtrar candidatos que:
+            // a) NO estén bloqueados por vacaciones o restricción fija
+            // b) AÚN NO hayan alcanzado su cuota límite infranqueable
             let candidates = doctors.map(doc => ({
               doc,
               avail: getAvailability(doc, currentDate),
               currentCount: counts[doc.id],
-              maxQuota: targetQuotas[doc.id]
+              maxQuota: maxQuotaMap[doc.id]
             })).filter(c => c.avail.status !== 'BLOQUEADO' && c.currentCount < c.maxQuota);
-
-            if (candidates.length === 0) {
-              candidates = doctors.map(doc => ({
-                doc,
-                avail: getAvailability(doc, currentDate),
-                currentCount: counts[doc.id],
-                maxQuota: targetQuotas[doc.id]
-              })).filter(c => c.avail.status !== 'BLOQUEADO');
-            }
 
             if (candidates.length === 0) {
               assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
             } else {
+              // Orden de prioridad entre candidatos elegibles:
+              // 1. Menor cantidad de días acumulados a la fecha
+              // 2. Menor penalización por horario (prefiere jornada completa)
+              // 3. Menor antigüedad (Rank mayor) para equilibrar la carga laboral
               candidates.sort((a, b) => {
-                if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
                 if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
-                return a.doc.rank - b.doc.rank;
+                if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
+                return b.doc.rank - a.doc.rank;
               });
 
               const selected = candidates[0];
