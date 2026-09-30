@@ -60,7 +60,7 @@
       width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: white;
     }
 
-    /* Selector de mes y año mejorado */
+    /* Selector de mes y año */
     .month-picker-container {
       display: flex;
       align-items: center;
@@ -109,8 +109,8 @@
       background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
       padding: 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;
     }
-    .doc-info { font-size: 0.85rem; }
-    .doc-info strong { color: var(--secondary); }
+    .doc-info { font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; }
+    .doc-color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
     .doc-actions { display: flex; gap: 0.3rem; }
 
     .checkbox-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; font-size: 0.8rem; margin-top: 0.3rem; }
@@ -126,13 +126,39 @@
     .calendar-header { text-align: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary); }
     .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
     .day-header { background: #f1f5f9; text-align: center; font-weight: 700; padding: 0.4rem; font-size: 0.75rem; color: var(--secondary); border-radius: 4px; }
-    .day-cell { border: 1px solid var(--border); min-height: 85px; padding: 0.35rem; border-radius: 6px; background: #ffffff; display: flex; flex-direction: column; justify-content: space-between; }
+    
+    .day-cell { 
+      border: 1px solid var(--border); 
+      min-height: 90px; 
+      padding: 0.35rem; 
+      border-radius: 6px; 
+      background: #ffffff; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: space-between; 
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
     .day-cell.empty { background: #fafafa; border-style: dashed; }
     .day-cell.holiday { background: var(--holiday-bg); border-color: var(--holiday-border); }
-    .day-number { font-weight: 700; font-size: 0.8rem; color: var(--secondary); }
-    .doctor-tag { background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.35rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; text-align: center; border-left: 3px solid var(--primary); }
+    .day-cell.drag-over { background: #e0f2fe !important; border: 2px dashed var(--primary) !important; }
+
+    .day-number { font-weight: 700; font-size: 0.8rem; color: var(--secondary); margin-bottom: 0.2rem; }
+    
+    .doctor-tag { 
+      padding: 0.35rem 0.4rem; 
+      border-radius: 6px; 
+      font-size: 0.72rem; 
+      font-weight: 600; 
+      text-align: center; 
+      cursor: grab;
+      user-select: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: transform 0.1s;
+    }
+    .doctor-tag:active { cursor: grabbing; transform: scale(0.96); }
+
     .holiday-tag { background: #fee2e2; color: var(--holiday-text); padding: 0.25rem 0.35rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; border-left: 3px solid var(--danger); }
-    .note-tag { font-size: 0.62rem; color: #64748b; margin-top: 0.15rem; line-height: 1.1; }
+    .note-tag { font-size: 0.62rem; color: #475569; margin-top: 0.2rem; font-weight: 500; line-height: 1.1; }
 
     .stats-table { width: 100%; margin-top: 1.25rem; border-collapse: collapse; font-size: 0.78rem; }
     .stats-table th, .stats-table td { border: 1px solid var(--border); padding: 0.4rem; text-align: left; }
@@ -223,6 +249,11 @@
           </div>
 
           <div class="form-group">
+            <label>Color de Etiqueta:</label>
+            <input type="color" id="doc-color" value="#0284c7">
+          </div>
+
+          <div class="form-group">
             <label>Días NO Disponibles (Ausencia fija):</label>
             <div class="checkbox-group">
               <label><input type="checkbox" id="no-lun"> Lunes</label>
@@ -284,7 +315,7 @@
       <div id="calendar-container">
         <div class="calendar-header">
           <h3 id="cal-title">ROL DE INTERCONSULTAS</h3>
-          <p style="font-size: 0.8rem; color: #64748b;" id="cal-subtitle">Presiona "Generar Calendario" para ver el cuadro</p>
+          <p style="font-size: 0.8rem; color: #64748b;" id="cal-subtitle">Puedes reacomodar manualmente los días arrastrando los nombres</p>
         </div>
 
         <div class="calendar-grid" id="calendar-grid">
@@ -312,17 +343,19 @@
   <script>
     let currentDateObj = new Date();
 
+    // Paleta de colores atractiva y diferenciada para cada asistente
     let doctors = [
-      { id: 'cruz', name: 'Dr. Cruz Guzmán', rank: 1, noDays: [2], earlyDay: 3, earlyTime: '14:00', ccss: false },
-      { id: 'rojas', name: 'Dr. Rojas Vázquez', rank: 2, noDays: [], earlyDay: null, earlyTime: '', ccss: true },
-      { id: 'rodriguez', name: 'Dra. Rodríguez Rojas', rank: 3, noDays: [1, 5], earlyDay: 4, earlyTime: '10:00', ccss: false },
-      { id: 'sandoval', name: 'Dr. Sandoval Alfaro', rank: 4, noDays: [1, 3], earlyDay: 5, earlyTime: '12:00', ccss: false },
-      { id: 'meza', name: 'Dr. Meza Aguilar', rank: 5, noDays: [1, 3, 5], earlyDay: 4, earlyTime: '11:00', ccss: false },
-      { id: 'zuniga', name: 'Dra. Zúñiga Villegas', rank: 6, noDays: [], earlyDay: null, earlyTime: '', ccss: false }
+      { id: 'cruz', name: 'Dr. Cruz Guzmán', rank: 1, color: '#3b82f6', bg: '#eff6ff', border: '#93c5fd', noDays: [2], earlyDay: 3, earlyTime: '14:00', ccss: false },
+      { id: 'rojas', name: 'Dr. Rojas Vázquez', rank: 2, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', noDays: [], earlyDay: null, earlyTime: '', ccss: true },
+      { id: 'rodriguez', name: 'Dra. Rodríguez Rojas', rank: 3, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', noDays: [1, 5], earlyDay: 4, earlyTime: '10:00', ccss: false },
+      { id: 'sandoval', name: 'Dr. Sandoval Alfaro', rank: 4, color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', noDays: [1, 3], earlyDay: 5, earlyTime: '12:00', ccss: false },
+      { id: 'meza', name: 'Dr. Meza Aguilar', rank: 5, color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8', noDays: [1, 3, 5], earlyDay: 4, earlyTime: '11:00', ccss: false },
+      { id: 'zuniga', name: 'Dra. Zúñiga Villegas', rank: 6, color: '#0891b2', bg: '#ecfeff', border: '#67e8f9', noDays: [], earlyDay: null, earlyTime: '', ccss: false }
     ];
 
     let absences = [];
     let holidays = [];
+    let currentAssignmentsMap = {}; // Guarda la asignación activa para permitir Drag & Drop manual
 
     function populateYearSelect() {
       const yearSelect = document.getElementById('select-year');
@@ -412,6 +445,7 @@
         list.innerHTML += `
           <div class="doc-item">
             <div class="doc-info">
+              <span class="doc-color-dot" style="background-color: ${doc.color};"></span>
               <strong>${doc.name}</strong> <small style="color:#64748b;">(#${doc.rank})</small>
             </div>
             <div class="doc-actions">
@@ -437,6 +471,7 @@
       document.getElementById('form-title').innerText = 'Agregar Nuevo Asistente';
       document.getElementById('doc-name').value = '';
       document.getElementById('doc-rank').value = doctors.length + 1;
+      document.getElementById('doc-color').value = '#0284c7';
       [ 'lun', 'mar', 'mie', 'jue', 'vie' ].forEach(d => document.getElementById(`no-${d}`).checked = false);
       document.getElementById('has-ccss').checked = false;
       document.getElementById('early-day').value = '';
@@ -452,6 +487,7 @@
       document.getElementById('form-title').innerText = 'Editar Horario de Asistente';
       document.getElementById('doc-name').value = doc.name;
       document.getElementById('doc-rank').value = doc.rank;
+      document.getElementById('doc-color').value = doc.color || '#0284c7';
 
       document.getElementById('no-lun').checked = doc.noDays.includes(1);
       document.getElementById('no-mar').checked = doc.noDays.includes(2);
@@ -470,6 +506,7 @@
       const id = document.getElementById('edit-doc-id').value || 'doc_' + Date.now();
       const name = document.getElementById('doc-name').value.trim();
       const rank = parseInt(document.getElementById('doc-rank').value);
+      const color = document.getElementById('doc-color').value;
 
       if(!name) { alert('Ingresa un nombre'); return; }
 
@@ -485,7 +522,12 @@
       const earlyTime = document.getElementById('early-time').value;
 
       const existingIndex = doctors.findIndex(d => d.id === id);
-      const newDoc = { id, name, rank, noDays, earlyDay, earlyTime, ccss };
+      
+      // Color semitransparente claro para fondo
+      const bg = color + '15'; 
+      const border = color + '60';
+
+      const newDoc = { id, name, rank, color, bg, border, noDays, earlyDay, earlyTime, ccss };
 
       if(existingIndex >= 0) {
         doctors[existingIndex] = newDoc;
@@ -562,7 +604,7 @@
       return false;
     }
 
-    // --- ALGORITMO DE ASIGNACIÓN MATEMÁTICAMENTE INVIOLABLE ---
+    // --- ALGORITMO DE DISTRIBUCIÓN MATEMÁTICO ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
       if (!monthInput || doctors.length === 0) { return; }
@@ -591,7 +633,6 @@
       const totalWorkDays = workDays.length;
       const numDocs = doctors.length;
 
-      // 1. CUOTAS MÁXIMAS INVIOLABLES DE VERDAD (Residuo para menos antiguos)
       const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
       const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
 
@@ -606,9 +647,9 @@
 
       let counts = {};
       doctors.forEach(d => counts[d.id] = 0);
-      let assignedMap = {}; // Key: dateStr, Value: docId
+      currentAssignmentsMap = {};
 
-      // 2. FASE DE BÚSQUEDA Y ASIGNACIÓN (SISTEMA DE BACKTRACKING / REORDENAMIENTO)
+      // Motor de resolución estricto por backtracking
       function solveDay(dayIndex) {
         if (dayIndex >= workDays.length) return true;
 
@@ -616,7 +657,6 @@
         const dateStr = date.toISOString().split('T')[0];
         const dayOfWeek = date.getDay();
 
-        // Ordenar candidatos disponibles según equidad
         let candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, date) && counts[doc.id] < maxQuotaMap[doc.id]);
 
         candidates.sort((a, b) => {
@@ -626,58 +666,27 @@
           const bEarly = (b.earlyDay === dayOfWeek && b.earlyTime) ? 1 : 0;
           if (aEarly !== bEarly) return aEarly - bEarly;
 
-          return b.rank - a.rank; // Favorece al de menor antigüedad
+          return b.rank - a.rank;
         });
 
         for (let cand of candidates) {
           counts[cand.id]++;
-          assignedMap[dateStr] = cand.id;
+          currentAssignmentsMap[dateStr] = cand.id;
 
           if (solveDay(dayIndex + 1)) return true;
 
-          // Backtrack si colisiona
           counts[cand.id]--;
-          delete assignedMap[dateStr];
+          delete currentAssignmentsMap[dateStr];
         }
 
         return false;
       }
 
-      // Ejecutar motor de resolución estricto
       solveDay(0);
-
-      // 3. ESTRUCTURAR RESPUESTA COMPLETA PARA EL CALENDARIO
-      let assignments = [];
-
-      for (let d = 1; d <= lastDay.getDate(); d++) {
-        const currentDate = new Date(year, month - 1, d);
-        const dayOfWeek = currentDate.getDay();
-        const dateStr = currentDate.toISOString().split('T')[0];
-
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-          if (holidayDaysMap[dateStr]) {
-            assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
-          } else {
-            const assignedDocId = assignedMap[dateStr];
-            const assignedDoc = doctors.find(doc => doc.id === assignedDocId);
-
-            if (assignedDoc) {
-              let noteStr = '';
-              if (assignedDoc.earlyDay === dayOfWeek && assignedDoc.earlyTime) {
-                noteStr = `Sale ${assignedDoc.earlyTime}`;
-              }
-              assignments.push({ date: currentDate, doc: assignedDoc, isHoliday: false, note: noteStr });
-            } else {
-              assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
-            }
-          }
-        }
-      }
-
-      renderCalendar(year, month, assignments, counts);
+      renderCalendarFromMap(year, month, holidayDaysMap);
     }
 
-    function renderCalendar(year, month, assignments, counts) {
+    function renderCalendarFromMap(year, month, holidayDaysMap) {
       const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
       document.getElementById('cal-title').innerText = `ROL DE INTERCONSULTAS - ${monthNames[month - 1].toUpperCase()} ${year}`;
 
@@ -690,6 +699,7 @@
         <div class="day-header">VIERNES</div>
       `;
 
+      const lastDay = new Date(year, month, 0);
       const firstDayOfMonth = new Date(year, month - 1, 1);
       let startingDay = firstDayOfMonth.getDay();
       if (startingDay === 0) startingDay = 7;
@@ -698,35 +708,63 @@
         grid.innerHTML += `<div class="day-cell empty"></div>`;
       }
 
-      assignments.forEach(item => {
-        const dayNum = item.date.getDate();
-        
-        if (item.isHoliday) {
-          grid.innerHTML += `
-            <div class="day-cell holiday">
-              <div class="day-number">${dayNum}</div>
-              <div>
-                <div class="holiday-tag"><i class="fa-solid fa-flag"></i> FERIADO</div>
-                <div class="note-tag" style="color:var(--holiday-text); font-weight:600;">${item.desc}</div>
-              </div>
-            </div>
-          `;
-        } else {
-          const docName = item.doc ? item.doc.name : 'N/A';
-          const noteHtml = item.note ? `<div class="note-tag"><i class="fa-solid fa-clock"></i> ${item.note}</div>` : '';
+      let counts = {};
+      doctors.forEach(d => counts[d.id] = 0);
 
-          grid.innerHTML += `
-            <div class="day-cell">
-              <div class="day-number">${dayNum}</div>
-              <div>
-                <div class="doctor-tag">${docName}</div>
-                ${noteHtml}
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        const currentDate = new Date(year, month - 1, d);
+        const dayOfWeek = currentDate.getDay();
+        const dateStr = currentDate.toISOString().split('T')[0];
+
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          if (holidayDaysMap && holidayDaysMap[dateStr]) {
+            grid.innerHTML += `
+              <div class="day-cell holiday">
+                <div class="day-number">${d}</div>
+                <div>
+                  <div class="holiday-tag"><i class="fa-solid fa-flag"></i> FERIADO</div>
+                  <div class="note-tag" style="color:var(--holiday-text); font-weight:600;">${holidayDaysMap[dateStr]}</div>
+                </div>
               </div>
-            </div>
-          `;
+            `;
+          } else {
+            const assignedDocId = currentAssignmentsMap[dateStr];
+            const doc = doctors.find(item => item.id === assignedDocId);
+
+            if (doc) {
+              counts[doc.id]++;
+              let noteStr = '';
+              if (doc.earlyDay === dayOfWeek && doc.earlyTime) {
+                noteStr = `Sale ${doc.earlyTime}`;
+              }
+
+              grid.innerHTML += `
+                <div class="day-cell" data-date="${dateStr}" ondragover="allowDrop(event)" ondragleave="removeDragOver(event)" ondrop="drop(event)">
+                  <div class="day-number">${d}</div>
+                  <div class="doctor-tag" 
+                       draggable="true" 
+                       ondragstart="drag(event)" 
+                       data-date="${dateStr}"
+                       data-docid="${doc.id}"
+                       style="background-color: ${doc.bg || '#e0f2fe'}; color: ${doc.color}; border: 1px solid ${doc.border || '#93c5fd'};">
+                    <i class="fa-solid fa-grip-vertical" style="opacity: 0.5; margin-right: 2px;"></i> ${doc.name}
+                    ${noteStr ? `<div class="note-tag" style="color:${doc.color};"><i class="fa-solid fa-clock"></i> ${noteStr}</div>` : ''}
+                  </div>
+                </div>
+              `;
+            } else {
+              grid.innerHTML += `
+                <div class="day-cell" data-date="${dateStr}" ondragover="allowDrop(event)" ondragleave="removeDragOver(event)" ondrop="drop(event)">
+                  <div class="day-number">${d}</div>
+                  <div style="font-size: 0.72rem; color:#94a3b8; text-align:center;">Sin Asignar</div>
+                </div>
+              `;
+            }
+          }
         }
-      });
+      }
 
+      // Renderizar Estadísticas
       const statsBody = document.getElementById('stats-body');
       statsBody.innerHTML = '';
       doctors.forEach(d => {
@@ -738,12 +776,63 @@
 
         statsBody.innerHTML += `
           <tr>
-            <td><strong>${d.name}</strong> <small>(Rank #${d.rank})</small></td>
+            <td>
+              <span class="doc-color-dot" style="background-color:${d.color};"></span>
+              <strong>${d.name}</strong> <small>(Rank #${d.rank})</small>
+            </td>
             <td><strong>${counts[d.id] || 0} días</strong></td>
             <td>${summary.join(' | ') || 'Jornada completa'}</td>
           </tr>
         `;
       });
+    }
+
+    // --- REACOMODOS MANUALES (DRAG & DROP) ---
+    function drag(ev) {
+      ev.dataTransfer.setData("srcDate", ev.target.getAttribute("data-date"));
+      ev.dataTransfer.setData("srcDocId", ev.target.getAttribute("data-docid"));
+    }
+
+    function allowDrop(ev) {
+      ev.preventDefault();
+      const cell = ev.target.closest('.day-cell');
+      if (cell) cell.classList.add('drag-over');
+    }
+
+    function removeDragOver(ev) {
+      const cell = ev.target.closest('.day-cell');
+      if (cell) cell.classList.remove('drag-over');
+    }
+
+    function drop(ev) {
+      ev.preventDefault();
+      const cell = ev.target.closest('.day-cell');
+      if (!cell) return;
+
+      cell.classList.remove('drag-over');
+      const targetDate = cell.getAttribute("data-date");
+      const srcDate = ev.dataTransfer.getData("srcDate");
+      const srcDocId = ev.dataTransfer.getData("srcDocId");
+
+      if (!targetDate || srcDate === targetDate) return;
+
+      // Intercambio de asignación manual
+      const existingTargetDocId = currentAssignmentsMap[targetDate];
+      currentAssignmentsMap[targetDate] = srcDocId;
+
+      if (existingTargetDocId) {
+        currentAssignmentsMap[srcDate] = existingTargetDocId;
+      } else {
+        delete currentAssignmentsMap[srcDate];
+      }
+
+      const monthInput = document.getElementById('selected-month').value;
+      const [year, month] = monthInput.split('-').map(Number);
+      
+      let holidayDaysMap = {};
+      holidays.forEach(h => holidayDaysMap[h.date] = h.desc);
+
+      renderCalendarFromMap(year, month, holidayDaysMap);
     }
 
     function downloadImage() {
