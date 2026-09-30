@@ -48,6 +48,35 @@
       width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: white;
     }
 
+    /* Selector de mes estilizado */
+    .month-picker-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.35rem 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .month-picker-btn {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--secondary);
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .month-picker-btn:hover { background: #e2e8f0; color: var(--primary-dark); }
+    .month-display {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--secondary);
+      text-transform: capitalize;
+    }
+
     .btn {
       background: var(--primary); color: white; border: none; padding: 0.65rem 1rem;
       border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;
@@ -110,10 +139,15 @@
       <!-- 1. MES Y ACCIONES PRINCIPALES -->
       <div class="card">
         <h2><i class="fa-regular fa-calendar-days"></i> Programación Mensual</h2>
-        <div class="form-group">
-          <label>Seleccionar Mes:</label>
-          <input type="month" id="selected-month">
+        
+        <label>Seleccionar Mes y Año:</label>
+        <div class="month-picker-container">
+          <button class="month-picker-btn" onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i> Anterior</button>
+          <span class="month-display" id="month-display-text">Octubre 2026</span>
+          <button class="month-picker-btn" onclick="changeMonth(1)">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
         </div>
+        <input type="hidden" id="selected-month">
+
         <button class="btn" onclick="generateSchedule()"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar Calendario</button>
         <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="downloadImage()"><i class="fa-solid fa-download"></i> Descargar Imagen PNG</button>
       </div>
@@ -232,7 +266,8 @@
   </div>
 
   <script>
-    // Configuración Inicial de Médicos
+    let currentDateObj = new Date();
+
     let doctors = [
       { id: 'cruz', name: 'Dr. Cruz Guzmán', rank: 1, noDays: [2], earlyDay: 3, earlyTime: '14:00', ccss: false },
       { id: 'rojas', name: 'Dr. Rojas Vázquez', rank: 2, noDays: [], earlyDay: null, earlyTime: '', ccss: true },
@@ -244,11 +279,23 @@
 
     let absences = [];
 
-    // Cargar fecha actual
-    const today = new Date();
-    document.getElementById('selected-month').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    function updateMonthDisplay() {
+      const year = currentDateObj.getFullYear();
+      const month = currentDateObj.getMonth();
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      
+      document.getElementById('month-display-text').innerText = `${monthNames[month]} ${year}`;
+      document.getElementById('selected-month').value = `${year}-${String(month + 1).padStart(2, '0')}`;
+    }
+
+    function changeMonth(offset) {
+      currentDateObj.setMonth(currentDateObj.getMonth() + offset);
+      updateMonthDisplay();
+      generateSchedule();
+    }
 
     function init() {
+      updateMonthDisplay();
       renderDoctorsList();
       updateDoctorSelect();
     }
@@ -389,7 +436,7 @@
       });
     }
 
-    // --- ALGORITMO DE ASIGNACIÓN ---
+    // --- ALGORITMO DE ASIGNACIÓN EQUITATIVO ---
     function getAvailability(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
@@ -414,7 +461,7 @@
 
       // 4. Salida Temprana / Horario Ajustado
       if(doc.earlyDay === dayOfWeek && doc.earlyTime) {
-        return { status: 'LIMITADO', penalty: 20, note: `Sale ${doc.earlyTime}` };
+        return { status: 'LIMITADO', penalty: 1, note: `Sale ${doc.earlyTime}` };
       }
 
       return { status: 'DISPONIBLE', penalty: 0, note: '' };
@@ -448,14 +495,14 @@
         if (candidates.length === 0) {
           assignments.push({ date, doc: null, note: 'Sin personal disponible' });
         } else {
-          // Criterios de ordenación:
-          // 1. Menor cantidad de días asignados acumulados (Equidad)
-          // 2. Menor penalización por restricción horaria
-          // 3. Menor antigüedad (Mayor número de rank/más nuevo primero)
+          // Orden de prioridad estricto para lograr equidad:
+          // 1. Menor cantidad de días asignados hasta el momento
+          // 2. Menor penalización por horarios especiales
+          // 3. Antigüedad
           candidates.sort((a, b) => {
             if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
             if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
-            return b.doc.rank - a.doc.rank;
+            return a.doc.rank - b.doc.rank;
           });
 
           const selected = candidates[0];
