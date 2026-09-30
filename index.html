@@ -562,7 +562,7 @@
       return false;
     }
 
-    // --- ALGORITMO GARANTIZADO DE ASIGNACIÓN 100% COBERTURA Y EQUIDAD ---
+    // --- ALGORITMO DE DISTRIBUCIÓN ESTRICTO POR ANTIGÜEDAD Y RESIDUO ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
       if (!monthInput || doctors.length === 0) { return; }
@@ -591,7 +591,7 @@
       const totalWorkDays = workDays.length;
       const numDocs = doctors.length;
 
-      // Cuotas ideales iniciales
+      // Cálculo de límites infranqueables por médico según residuo de menor antigüedad
       const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
       const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
 
@@ -600,6 +600,7 @@
       let maxQuotaMap = {};
       doctors.forEach(d => maxQuotaMap[d.id] = baseQuota);
 
+      // El residuo se asigna a los de MENOR antigüedad (Rank mayor)
       for (let i = 0; i < remainder; i++) {
         maxQuotaMap[docsByRankInverted[i].id] += 1;
       }
@@ -617,10 +618,10 @@
           if (holidayDaysMap[dateStr]) {
             assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
           } else {
-            // Nivel 1: Candidatos disponibles bajo su cuota máxima ideal
+            // Nivel 1: Candidatos con disponibilidad que NO superen su tope de días
             let candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate) && counts[doc.id] < maxQuotaMap[doc.id]);
 
-            // Nivel 2 (Garantía de Cobertura Total): Si no hay nadie bajo cuota ideal, tomar a cualquiera que no tenga bloqueo absoluto
+            // Nivel 2: Si no hay nadie por tope estricto, buscar candidatos menos antiguos disponibles
             if (candidates.length === 0) {
               candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate));
             }
@@ -629,16 +630,10 @@
               assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
             } else {
               // Criterios de Selección:
-              // 1. Menor cantidad acumulada de días asignados en el mes (Mantiene equidad extrema)
-              // 2. Prefiere jornada completa antes de salida temprana
-              // 3. Menor antigüedad (Rank mayor)
+              // 1. Menor cantidad acumulada de días asignados
+              // 2. Antigüedad inversa (Rank mayor primero para favorecer a los menos antiguos)
               candidates.sort((a, b) => {
                 if (counts[a.id] !== counts[b.id]) return counts[a.id] - counts[b.id];
-                
-                const aEarly = (a.earlyDay === dayOfWeek && a.earlyTime) ? 1 : 0;
-                const bEarly = (b.earlyDay === dayOfWeek && b.earlyTime) ? 1 : 0;
-                if (aEarly !== bEarly) return aEarly - bEarly;
-
                 return b.rank - a.rank;
               });
 
