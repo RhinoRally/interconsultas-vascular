@@ -562,7 +562,7 @@
       return false;
     }
 
-    // --- ALGORITMO DE DISTRIBUCIÓN ESTRICTO POR ANTIGÜEDAD Y RESIDUO ---
+    // --- ALGORITMO DE ASIGNACIÓN MATEMÁTICAMENTE INVIOLABLE ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
       if (!monthInput || doctors.length === 0) { return; }
@@ -591,7 +591,7 @@
       const totalWorkDays = workDays.length;
       const numDocs = doctors.length;
 
-      // Cálculo de límites infranqueables por médico según residuo de menor antigüedad
+      // 1. CUOTAS MÁXIMAS INVIOLABLES DE VERDAD (Residuo para menos antiguos)
       const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
       const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
 
@@ -600,13 +600,53 @@
       let maxQuotaMap = {};
       doctors.forEach(d => maxQuotaMap[d.id] = baseQuota);
 
-      // El residuo se asigna a los de MENOR antigüedad (Rank mayor)
       for (let i = 0; i < remainder; i++) {
         maxQuotaMap[docsByRankInverted[i].id] += 1;
       }
 
       let counts = {};
       doctors.forEach(d => counts[d.id] = 0);
+      let assignedMap = {}; // Key: dateStr, Value: docId
+
+      // 2. FASE DE BÚSQUEDA Y ASIGNACIÓN (SISTEMA DE BACKTRACKING / REORDENAMIENTO)
+      function solveDay(dayIndex) {
+        if (dayIndex >= workDays.length) return true;
+
+        const date = workDays[dayIndex];
+        const dateStr = date.toISOString().split('T')[0];
+        const dayOfWeek = date.getDay();
+
+        // Ordenar candidatos disponibles según equidad
+        let candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, date) && counts[doc.id] < maxQuotaMap[doc.id]);
+
+        candidates.sort((a, b) => {
+          if (counts[a.id] !== counts[b.id]) return counts[a.id] - counts[b.id];
+          
+          const aEarly = (a.earlyDay === dayOfWeek && a.earlyTime) ? 1 : 0;
+          const bEarly = (b.earlyDay === dayOfWeek && b.earlyTime) ? 1 : 0;
+          if (aEarly !== bEarly) return aEarly - bEarly;
+
+          return b.rank - a.rank; // Favorece al de menor antigüedad
+        });
+
+        for (let cand of candidates) {
+          counts[cand.id]++;
+          assignedMap[dateStr] = cand.id;
+
+          if (solveDay(dayIndex + 1)) return true;
+
+          // Backtrack si colisiona
+          counts[cand.id]--;
+          delete assignedMap[dateStr];
+        }
+
+        return false;
+      }
+
+      // Ejecutar motor de resolución estricto
+      solveDay(0);
+
+      // 3. ESTRUCTURAR RESPUESTA COMPLETA PARA EL CALENDARIO
       let assignments = [];
 
       for (let d = 1; d <= lastDay.getDate(); d++) {
@@ -618,34 +658,17 @@
           if (holidayDaysMap[dateStr]) {
             assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
           } else {
-            // Nivel 1: Candidatos con disponibilidad que NO superen su tope de días
-            let candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate) && counts[doc.id] < maxQuotaMap[doc.id]);
+            const assignedDocId = assignedMap[dateStr];
+            const assignedDoc = doctors.find(doc => doc.id === assignedDocId);
 
-            // Nivel 2: Si no hay nadie por tope estricto, buscar candidatos menos antiguos disponibles
-            if (candidates.length === 0) {
-              candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate));
-            }
-
-            if (candidates.length === 0) {
-              assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
-            } else {
-              // Criterios de Selección:
-              // 1. Menor cantidad acumulada de días asignados
-              // 2. Antigüedad inversa (Rank mayor primero para favorecer a los menos antiguos)
-              candidates.sort((a, b) => {
-                if (counts[a.id] !== counts[b.id]) return counts[a.id] - counts[b.id];
-                return b.rank - a.rank;
-              });
-
-              const selected = candidates[0];
-              counts[selected.id]++;
-
+            if (assignedDoc) {
               let noteStr = '';
-              if (selected.earlyDay === dayOfWeek && selected.earlyTime) {
-                noteStr = `Sale ${selected.earlyTime}`;
+              if (assignedDoc.earlyDay === dayOfWeek && assignedDoc.earlyTime) {
+                noteStr = `Sale ${assignedDoc.earlyTime}`;
               }
-
-              assignments.push({ date: currentDate, doc: selected, isHoliday: false, note: noteStr });
+              assignments.push({ date: currentDate, doc: assignedDoc, isHoliday: false, note: noteStr });
+            } else {
+              assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
             }
           }
         }
