@@ -20,6 +20,9 @@
       --border: #e2e8f0;
       --text: #334155;
       --danger: #ef4444;
+      --holiday-bg: #fef2f2;
+      --holiday-border: #fca5a5;
+      --holiday-text: #991b1b;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
@@ -98,13 +101,13 @@
     .doc-info strong { color: var(--secondary); }
     .doc-actions { display: flex; gap: 0.3rem; }
 
-    /* Modal / Edición de Horarios */
+    /* Formulario Checkbox */
     .checkbox-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; font-size: 0.8rem; margin-top: 0.3rem; }
     .checkbox-group label { font-weight: normal; display: flex; align-items: center; gap: 0.3rem; margin: 0; }
 
-    /* Ausencias */
-    .absence-list { margin-top: 0.8rem; max-height: 150px; overflow-y: auto; }
-    .absence-item {
+    /* Listas genéricas (Ausencias y Feriados) */
+    .custom-list { margin-top: 0.8rem; max-height: 150px; overflow-y: auto; }
+    .custom-item {
       display: flex; justify-content: space-between; align-items: center;
       background: #f1f5f9; padding: 0.4rem 0.6rem; border-radius: 6px; margin-bottom: 0.4rem; font-size: 0.8rem;
     }
@@ -116,8 +119,10 @@
     .day-header { background: #f1f5f9; text-align: center; font-weight: 700; padding: 0.4rem; font-size: 0.75rem; color: var(--secondary); border-radius: 4px; }
     .day-cell { border: 1px solid var(--border); min-height: 85px; padding: 0.35rem; border-radius: 6px; background: #ffffff; display: flex; flex-direction: column; justify-content: space-between; }
     .day-cell.empty { background: #fafafa; border-style: dashed; }
+    .day-cell.holiday { background: var(--holiday-bg); border-color: var(--holiday-border); }
     .day-number { font-weight: 700; font-size: 0.8rem; color: var(--secondary); }
     .doctor-tag { background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.35rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; text-align: center; border-left: 3px solid var(--primary); }
+    .holiday-tag { background: #fee2e2; color: var(--holiday-text); padding: 0.25rem 0.35rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; border-left: 3px solid var(--danger); }
     .note-tag { font-size: 0.62rem; color: #64748b; margin-top: 0.15rem; line-height: 1.1; }
 
     .stats-table { width: 100%; margin-top: 1.25rem; border-collapse: collapse; font-size: 0.78rem; }
@@ -129,7 +134,7 @@
 
   <header>
     <h1><i class="fa-solid fa-hospital-user"></i> Programación de Interconsultas</h1>
-    <p>Servicio de Cirugía Vascular - Gestión Flexible de Personal y Horarios</p>
+    <p>Servicio de Cirugía Vascular - Gestión Flexible de Personal, Horarios y Feriados</p>
   </header>
 
   <div class="grid-layout">
@@ -152,7 +157,22 @@
         <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="downloadImage()"><i class="fa-solid fa-download"></i> Descargar Imagen PNG</button>
       </div>
 
-      <!-- 2. GESTIÓN DE ASISTENTES -->
+      <!-- 2. GESTIÓN DE FERIADOS / ASUETOS -->
+      <div class="card">
+        <h2><i class="fa-solid fa-calendar-minus"></i> Días Feriados / Asuetos</h2>
+        <div class="form-group">
+          <label>Fecha del Feriado:</label>
+          <input type="date" id="holiday-date">
+        </div>
+        <div class="form-group">
+          <label>Descripción / Motivo:</label>
+          <input type="text" id="holiday-desc" placeholder="Ej: Día de las Culturas">
+        </div>
+        <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="addHoliday()"><i class="fa-solid fa-plus"></i> Agregar Feriado</button>
+        <div class="custom-list" id="holiday-list"></div>
+      </div>
+
+      <!-- 3. GESTIÓN DE ASISTENTES -->
       <div class="card">
         <h2><i class="fa-solid fa-user-gear"></i> Gestión de Asistentes</h2>
         <div id="doctors-list">
@@ -212,7 +232,7 @@
         </div>
       </div>
 
-      <!-- 3. VACACIONES Y CONGRESOS -->
+      <!-- 4. VACACIONES Y CONGRESOS -->
       <div class="card">
         <h2><i class="fa-solid fa-plane-departure"></i> Vacaciones y Permisos</h2>
         <div class="form-group">
@@ -230,7 +250,7 @@
           </div>
         </div>
         <button class="btn btn-secondary btn-sm" style="width:100%;" onclick="addAbsence()"><i class="fa-solid fa-plus"></i> Registrar Permiso</button>
-        <div class="absence-list" id="absence-list"></div>
+        <div class="custom-list" id="absence-list"></div>
       </div>
 
     </div>
@@ -278,6 +298,7 @@
     ];
 
     let absences = [];
+    let holidays = [];
 
     function updateMonthDisplay() {
       const year = currentDateObj.getFullYear();
@@ -298,6 +319,46 @@
       updateMonthDisplay();
       renderDoctorsList();
       updateDoctorSelect();
+      renderHolidays();
+    }
+
+    // --- GESTIÓN DE FERIADOS ---
+    function addHoliday() {
+      const date = document.getElementById('holiday-date').value;
+      const desc = document.getElementById('holiday-desc').value.trim() || 'Feriado / Asueto';
+
+      if (!date) { alert('Selecciona una fecha para el feriado'); return; }
+
+      if (holidays.some(h => h.date === date)) {
+        alert('Esta fecha ya está registrada como feriado');
+        return;
+      }
+
+      holidays.push({ id: Date.now(), date, desc });
+      document.getElementById('holiday-date').value = '';
+      document.getElementById('holiday-desc').value = '';
+      renderHolidays();
+      generateSchedule();
+    }
+
+    function removeHoliday(id) {
+      holidays = holidays.filter(h => h.id !== id);
+      renderHolidays();
+      generateSchedule();
+    }
+
+    function renderHolidays() {
+      const list = document.getElementById('holiday-list');
+      list.innerHTML = '';
+      holidays.sort((a, b) => a.date.localeCompare(b.date));
+      holidays.forEach(h => {
+        list.innerHTML += `
+          <div class="custom-item">
+            <span><strong>${h.date}</strong>: ${h.desc}</span>
+            <button style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="removeHoliday(${h.id})"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `;
+      });
     }
 
     // --- GESTIÓN DE ASISTENTES ---
@@ -392,12 +453,14 @@
 
       hideDoctorForm();
       renderDoctorsList();
+      generateSchedule();
     }
 
     function deleteDoctor(id) {
       if(confirm('¿Seguro que deseas eliminar a este asistente del servicio?')) {
         doctors = doctors.filter(d => d.id !== id);
         renderDoctorsList();
+        generateSchedule();
       }
     }
 
@@ -416,11 +479,13 @@
       const docName = doctors.find(d => d.id === docId).name;
       absences.push({ id: Date.now(), docId, docName, start, end });
       renderAbsences();
+      generateSchedule();
     }
 
     function removeAbsence(id) {
       absences = absences.filter(a => a.id !== id);
       renderAbsences();
+      generateSchedule();
     }
 
     function renderAbsences() {
@@ -428,7 +493,7 @@
       list.innerHTML = '';
       absences.forEach(a => {
         list.innerHTML += `
-          <div class="absence-item">
+          <div class="custom-item">
             <span><strong>${a.docName}</strong>: ${a.start} al ${a.end}</span>
             <button style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="removeAbsence(${a.id})"><i class="fa-solid fa-trash"></i></button>
           </div>
@@ -436,7 +501,7 @@
       });
     }
 
-    // --- ALGORITMO DE ASIGNACIÓN EQUITATIVO ---
+    // --- VERIFICACIÓN DE DISPONIBILIDAD ---
     function getAvailability(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
@@ -459,7 +524,7 @@
         }
       }
 
-      // 4. Salida Temprana / Horario Ajustado
+      // 4. Salida Temprana
       if(doc.earlyDay === dayOfWeek && doc.earlyTime) {
         return { status: 'LIMITADO', penalty: 1, note: `Sale ${doc.earlyTime}` };
       }
@@ -467,49 +532,103 @@
       return { status: 'DISPONIBLE', penalty: 0, note: '' };
     }
 
+    // --- ALGORITMO DE ASIGNACIÓN MATEMÁTICAMENTE EQUITATIVO ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
-      if (!monthInput || doctors.length === 0) { alert('Asegúrate de seleccionar un mes y tener asistentes configurados'); return; }
+      if (!monthInput || doctors.length === 0) { return; }
 
       const [year, month] = monthInput.split('-').map(Number);
       const lastDay = new Date(year, month, 0);
 
+      // 1. Obtener días laborables reales excluyendo fines de semana Y feriados registrados
       let workDays = [];
+      let holidayDaysMap = {};
+
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const currentDate = new Date(year, month - 1, d);
         const dayOfWeek = currentDate.getDay();
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) workDays.push(currentDate);
+        const dateStr = currentDate.toISOString().split('T')[0];
+
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          const holidayFound = holidays.find(h => h.date === dateStr);
+          if (holidayFound) {
+            holidayDaysMap[dateStr] = holidayFound.desc;
+          } else {
+            workDays.push(currentDate);
+          }
+        }
+      }
+
+      const totalWorkDays = workDays.length;
+      const numDocs = doctors.length;
+
+      // 2. Cálculo estricto de Cuotas Máximas Objetivos por Médico
+      const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
+      const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
+
+      // Ordenar médicos en orden INVERSO a su antigüedad (Rank mayor a menor: #6, #5, #4...)
+      let docsByRankInverted = [...doctors].sort((a, b) => b.rank - a.rank);
+      
+      let targetQuotas = {};
+      doctors.forEach(d => targetQuotas[d.id] = baseQuota);
+
+      // Asignar el residuo (+1 día) a los médicos de menor antigüedad
+      for (let i = 0; i < remainder; i++) {
+        targetQuotas[docsByRankInverted[i].id] += 1;
       }
 
       let counts = {};
       doctors.forEach(d => counts[d.id] = 0);
       let assignments = [];
 
-      workDays.forEach(date => {
-        let candidates = doctors.map(doc => ({
-          doc,
-          avail: getAvailability(doc, date),
-          currentCount: counts[doc.id]
-        })).filter(c => c.avail.status !== 'BLOQUEADO');
+      // Recorrer todos los días del mes de Lunes a Viernes para estructurar la grilla completa
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        const currentDate = new Date(year, month - 1, d);
+        const dayOfWeek = currentDate.getDay();
+        const dateStr = currentDate.toISOString().split('T')[0];
 
-        if (candidates.length === 0) {
-          assignments.push({ date, doc: null, note: 'Sin personal disponible' });
-        } else {
-          // Orden de prioridad estricto para lograr equidad:
-          // 1. Menor cantidad de días asignados hasta el momento
-          // 2. Menor penalización por horarios especiales
-          // 3. Antigüedad
-          candidates.sort((a, b) => {
-            if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
-            if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
-            return a.doc.rank - b.doc.rank;
-          });
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          if (holidayDaysMap[dateStr]) {
+            assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
+          } else {
+            // Filtrar candidatos disponibles que aún no alcanzan su cuota máxima
+            let candidates = doctors.map(doc => ({
+              doc,
+              avail: getAvailability(doc, currentDate),
+              currentCount: counts[doc.id],
+              maxQuota: targetQuotas[doc.id]
+            })).filter(c => c.avail.status !== 'BLOQUEADO' && c.currentCount < c.maxQuota);
 
-          const selected = candidates[0];
-          counts[selected.doc.id]++;
-          assignments.push({ date, doc: selected.doc, note: selected.avail.note });
+            // Fallback: Si no hay nadie por cuota, evaluar cualquier disponible no bloqueado
+            if (candidates.length === 0) {
+              candidates = doctors.map(doc => ({
+                doc,
+                avail: getAvailability(doc, currentDate),
+                currentCount: counts[doc.id],
+                maxQuota: targetQuotas[doc.id]
+              })).filter(c => c.avail.status !== 'BLOQUEADO');
+            }
+
+            if (candidates.length === 0) {
+              assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
+            } else {
+              // Ordenar candidatos por:
+              // 1. Menor cantidad de días asignados acumulados
+              // 2. Menor penalización por horarios
+              // 3. Antigüedad (Rank menor primero)
+              candidates.sort((a, b) => {
+                if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
+                if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
+                return a.doc.rank - b.doc.rank;
+              });
+
+              const selected = candidates[0];
+              counts[selected.doc.id]++;
+              assignments.push({ date: currentDate, doc: selected.doc, isHoliday: false, note: selected.avail.note });
+            }
+          }
         }
-      });
+      }
 
       renderCalendar(year, month, assignments, counts);
     }
@@ -537,18 +656,31 @@
 
       assignments.forEach(item => {
         const dayNum = item.date.getDate();
-        const docName = item.doc ? item.doc.name : 'N/A';
-        const noteHtml = item.note ? `<div class="note-tag"><i class="fa-solid fa-clock"></i> ${item.note}</div>` : '';
-
-        grid.innerHTML += `
-          <div class="day-cell">
-            <div class="day-number">${dayNum}</div>
-            <div>
-              <div class="doctor-tag">${docName}</div>
-              ${noteHtml}
+        
+        if (item.isHoliday) {
+          grid.innerHTML += `
+            <div class="day-cell holiday">
+              <div class="day-number">${dayNum}</div>
+              <div>
+                <div class="holiday-tag"><i class="fa-solid fa-flag"></i> FERIADO</div>
+                <div class="note-tag" style="color:var(--holiday-text); font-weight:600;">${item.desc}</div>
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        } else {
+          const docName = item.doc ? item.doc.name : 'N/A';
+          const noteHtml = item.note ? `<div class="note-tag"><i class="fa-solid fa-clock"></i> ${item.note}</div>` : '';
+
+          grid.innerHTML += `
+            <div class="day-cell">
+              <div class="day-number">${dayNum}</div>
+              <div>
+                <div class="doctor-tag">${docName}</div>
+                ${noteHtml}
+              </div>
+            </div>
+          `;
+        }
       });
 
       const statsBody = document.getElementById('stats-body');
@@ -563,7 +695,7 @@
         statsBody.innerHTML += `
           <tr>
             <td><strong>${d.name}</strong> <small>(Rank #${d.rank})</small></td>
-            <td>${counts[d.id] || 0} días</td>
+            <td><strong>${counts[d.id] || 0} días</strong></td>
             <td>${summary.join(' | ') || 'Jornada completa'}</td>
           </tr>
         `;
