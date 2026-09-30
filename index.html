@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Programación de Interconsultas - Servicio de Cirugía Vascular</title>
+  <!-- Google Fonts & FontAwesome Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- html2canvas para exportar la tabla como imagen -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --secondary: #0f172a;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #334155;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0284c7, #0f172a);
+      color: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    header p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      margin-top: 0.25rem;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: var(--secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: var(--text);
+    }
+
+    input[type="month"], select, input[type="date"] {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: white;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #475569;
+    }
+    .btn-secondary:hover {
+      background: #334155;
+    }
+
+    /* Listado de ausencias */
+    .absence-list {
+      margin-top: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .absence-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f1f5f9;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .absence-item button {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+    }
+
+    /* Previsualización e Impresión */
+    #calendar-container {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .calendar-header {
+      text-align: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .calendar-header h3 {
+      font-size: 1.25rem;
+      color: var(--secondary);
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.5rem;
+    }
+
+    .day-header {
+      background: #f1f5f9;
+      text-align: center;
+      font-weight: 700;
+      padding: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--secondary);
+      border-radius: 4px;
+    }
+
+    .day-cell {
+      border: 1px solid var(--border);
+      min-height: 90px;
+      padding: 0.4rem;
+      border-radius: 6px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .day-cell.empty {
+      background: #fafafa;
+      border-style: dashed;
+    }
+
+    .day-number {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--secondary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .doctor-tag {
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 0.3rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 0.25rem;
+      text-align: center;
+      border-left: 3px solid var(--primary);
+    }
+
+    .note-tag {
+      font-size: 0.65rem;
+      color: #64748b;
+      margin-top: 0.2rem;
+      line-height: 1.1;
+    }
+
+    .stats-table {
+      width: 100%;
+      margin-top: 1.5rem;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .stats-table th, .stats-table td {
+      border: 1px solid var(--border);
+      padding: 0.4rem;
+      text-align: left;
+    }
+
+    .stats-table th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1><i class="fa-solid fa-hospital-user"></i> Programación de Interconsultas</h1>
+    <p>Servicio de Cirugía Vascular - Distribución Mensual Automática</p>
+  </header>
+
+  <div class="grid-container">
+    <!-- COLUMNA IZQUIERDA: CONTROLES -->
+    <div class="controls-column">
+      
+      <div class="card">
+        <h2><i class="fa-regular fa-calendar-days"></i> 1. Selección de Mes</h2>
+        <div class="form-group">
+          <label>Mes y Año:</label>
+          <input type="month" id="selected-month">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><i class="fa-solid fa-user-slash"></i> 2. Permisos y Vacaciones</h2>
+        <div class="form-group">
+          <label>Asistente:</label>
+          <select id="abs-doctor">
+            <option value="cruz">Dr. Cruz Guzmán</option>
+            <option value="rojas">Dr. Rojas Vázquez</option>
+            <option value="rodriguez">Dra. Rodríguez Rojas</option>
+            <option value="sandoval">Dr. Sandoval Alfaro</option>
+            <option value="meza">Dr. Meza Aguilar</option>
+            <option value="zuniga">Dra. Zúñiga Villegas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Desde:</label>
+          <input type="date" id="abs-start">
+        </div>
+        <div class="form-group">
+          <label>Hasta:</label>
+          <input type="date" id="abs-end">
+        </div>
+        <button class="btn btn-secondary" onclick="addAbsence()"><i class="fa-solid fa-plus"></i> Agregar Novedad</button>
+
+        <div class="absence-list" id="absence-list">
+          <!-- Se llena dinámicamente -->
+        </div>
+      </div>
+
+      <button class="btn" onclick="generateSchedule()"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar Calendario Mensual</button>
+      <br>
+      <button class="btn btn-secondary" onclick="downloadImage()"><i class="fa-solid fa-download"></i> Descargar Cuadro (Imagen PNG)</button>
+    </div>
+
+    <!-- COLUMNA DERECHA: RESULTADO DEL CALENDARIO -->
+    <div class="results-column">
+      <div id="calendar-container">
+        <div class="calendar-header">
+          <h3 id="cal-title">ROL DE INTERCONSULTAS</h3>
+          <p style="font-size: 0.8rem; color: #64748b;" id="cal-subtitle">Selecciona un mes para generar el cuadro</p>
+        </div>
+
+        <div class="calendar-grid" id="calendar-grid">
+          <div class="day-header">LUNES</div>
+          <div class="day-header">MARTES</div>
+          <div class="day-header">MIÉRCOLES</div>
+          <div class="day-header">JUEVES</div>
+          <div class="day-header">VIERNES</div>
+          <!-- Celdas dinámicas -->
+        </div>
+
+        <table class="stats-table" id="stats-table">
+          <thead>
+            <tr>
+              <th>Asistente</th>
+              <th>Días Asignados</th>
+              <th>Notas / Restricciones</th>
+            </tr>
+          </thead>
+          <tbody id="stats-body">
+            <!-- Totales dinámicos -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Médicos ordenados por antigüedad desc (Cruz = 1, Zúñiga = 6)
+    const doctors = [
+      { id: 'cruz', name: 'Dr. Cruz Guzmán', rank: 1 },
+      { id: 'rojas', name: 'Dr. Rojas Vázquez', rank: 2 },
+      { id: 'rodriguez', name: 'Dra. Rodríguez Rojas', rank: 3 },
+      { id: 'sandoval', name: 'Dr. Sandoval Alfaro', rank: 4 },
+      { id: 'meza', name: 'Dr. Meza Aguilar', rank: 5 },
+      { id: 'zuniga', name: 'Dra. Zúñiga Villegas', rank: 6 }
+    ];
+
+    let absences = [];
+
+    // Establecer mes actual por defecto
+    const today = new Date();
+    document.getElementById('selected-month').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+    function addAbsence() {
+      const docId = document.getElementById('abs-doctor').value;
+      const start = document.getElementById('abs-start').value;
+      const end = document.getElementById('abs-end').value;
+
+      if(!start || !end) {
+        alert('Por favor selecciona las fechas de inicio y fin');
+        return;
+      }
+
+      const docName = doctors.find(d => d.id === docId).name;
+      absences.push({ id: Date.now(), docId, docName, start, end });
+      renderAbsences();
+    }
+
+    function removeAbsence(id) {
+      absences = absences.filter(a => a.id !== id);
+      renderAbsences();
+    }
+
+    function renderAbsences() {
+      const list = document.getElementById('absence-list');
+      list.innerHTML = '';
+      absences.forEach(a => {
+        list.innerHTML += `
+          <div class="absence-item">
+            <span><strong>${a.docName}</strong>: ${a.start} al ${a.end}</span>
+            <button onclick="removeAbsence(${a.id})"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `;
+      });
+    }
+
+    // Comprobación de disponibilidad individual por día
+    function getAvailability(docId, date) {
+      const dayOfWeek = date.getDay(); // 0 = Dom, 1 = Lun, ... 5 = Vie, 6 = Sáb
+      const dateStr = date.toISOString().split('T')[0];
+
+      // 1. Revisar Vacaciones/Permisos
+      const isAbsent = absences.some(a => a.docId === docId && dateStr >= a.start && dateStr <= a.end);
+      if(isAbsent) return { status: 'BLOQUEADO', penalty: 999, note: 'Vacaciones/Permiso' };
+
+      // 2. Horarios Fijos Semanales
+      // Sandoval: No Lun (1), No Mié (3), Vie (5) última opción
+      if (docId === 'sandoval') {
+        if (dayOfWeek === 1 || dayOfWeek === 3) return { status: 'BLOQUEADO', penalty: 999 };
+        if (dayOfWeek === 5) return { status: 'RESTRINGIDO', penalty: 50, note: 'Sale 12md' };
+      }
+
+      // Meza: No Lun (1), No Mié (3), No Vie (5), Jue (4) última opción
+      if (docId === 'meza') {
+        if (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) return { status: 'BLOQUEADO', penalty: 999 };
+        if (dayOfWeek === 4) return { status: 'RESTRINGIDO', penalty: 50, note: 'Sale 11am' };
+      }
+
+      // Cruz: No Mar (2), Mié (3) sale 2pm
+      if (docId === 'cruz') {
+        if (dayOfWeek === 2) return { status: 'BLOQUEADO', penalty: 999 };
+        if (dayOfWeek === 3) return { status: 'LIMITADO', penalty: 10, note: 'Sale 2pm' };
+      }
+
+      // Rodríguez: No Mié (3), No Vie (5), Jue (4) sale 10am
+      if (docId === 'rodriguez') {
+        if (dayOfWeek === 3 || dayOfWeek === 5) return { status: 'BLOQUEADO', penalty: 999 };
+        if (dayOfWeek === 4) return { status: 'LIMITADO', penalty: 10, note: 'Sale 10am' };
+      }
+
+      // Rojas: Reunión CCSS los 2dos y 4tos jueves del mes
+      if (docId === 'rojas' && dayOfWeek === 4) {
+        const dayOfMonth = date.getDate();
+        const thursdayIndex = Math.ceil(dayOfMonth / 7);
+        if (thursdayIndex === 2 || thursdayIndex === 4) {
+          return { status: 'BLOQUEADO', penalty: 999, note: '2.º/4.º Jueves CCSS' };
+        }
+      }
+
+      return { status: 'DISPONIBLE', penalty: 0, note: '' };
+    }
+
+    function generateSchedule() {
+      const monthInput = document.getElementById('selected-month').value;
+      if (!monthInput) return;
+
+      const [year, month] = monthInput.split('-').map(Number);
+      const firstDay = new Date(year, month - 1, 1);
+      const lastDay = new Date(year, month, 0);
+
+      // Recopilar todos los días hábiles del mes (Lunes a Viernes)
+      let workDays = [];
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        const currentDate = new Date(year, month - 1, d);
+        const dayOfWeek = currentDate.getDay();
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          workDays.push(currentDate);
+        }
+      }
+
+      // Inicializar contador de días por médico
+      let counts = {};
+      doctors.forEach(d => counts[d.id] = 0);
+
+      let assignments = [];
+
+      // Asignación de días
+      workDays.forEach(date => {
+        let candidates = doctors.map(doc => {
+          const avail = getAvailability(doc.id, date);
+          return {
+            doc,
+            avail,
+            currentCount: counts[doc.id]
+          };
+        });
+
+        // Filtrar no bloqueados
+        candidates = candidates.filter(c => c.avail.status !== 'BLOQUEADO');
+
+        if (candidates.length === 0) {
+          assignments.push({ date, doc: null, note: 'Sin personal disponible' });
+        } else {
+          // Ordenar candidatos:
+          // 1. Menor cantidad de días asignados hasta el momento (Equidad)
+          // 2. Menor penalización por restricción horaria
+          // 3. Menor antigüedad (Zúñiga primero) en caso de empate
+          candidates.sort((a, b) => {
+            if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
+            if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
+            return b.doc.rank - a.doc.rank;
+          });
+
+          const selected = candidates[0];
+          counts[selected.doc.id]++;
+          assignments.push({ date: date, doc: selected.doc, note: selected.avail.note });
+        }
+      });
+
+      renderCalendar(year, month, assignments, counts);
+    }
+
+    function renderCalendar(year, month, assignments, counts) {
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      document.getElementById('cal-title').innerText = `ROL DE INTERCONSULTAS - ${monthNames[month - 1].toUpperCase()} ${year}`;
+      document.getElementById('cal-subtitle').innerText = `Servicio de Cirugía Vascular - Hospital San Juan de Dios`;
+
+      const grid = document.getElementById('calendar-grid');
+      // Mantener encabezados de días
+      grid.innerHTML = `
+        <div class="day-header">LUNES</div>
+        <div class="day-header">MARTES</div>
+        <div class="day-header">MIÉRCOLES</div>
+        <div class="day-header">JUEVES</div>
+        <div class="day-header">VIERNES</div>
+      `;
+
+      const firstDayOfMonth = new Date(year, month - 1, 1);
+      let startingDay = firstDayOfMonth.getDay(); // 0: Dom, 1: Lun...
+      if (startingDay === 0) startingDay = 7; // Ajustar domingo
+
+      // Rellenar espacios en blanco del inicio de semana si empieza después del lunes
+      for (let i = 1; i < startingDay && i <= 5; i++) {
+        grid.innerHTML += `<div class="day-cell empty"></div>`;
+      }
+
+      assignments.forEach(item => {
+        const dayNum = item.date.getDate();
+        const docName = item.doc ? item.doc.name : 'N/A';
+        const noteHtml = item.note ? `<div class="note-tag"><i class="fa-solid fa-clock"></i> ${item.note}</div>` : '';
+
+        grid.innerHTML += `
+          <div class="day-cell">
+            <div class="day-number"><span>${dayNum}</span></div>
+            <div>
+              <div class="doctor-tag">${docName}</div>
+              ${noteHtml}
+            </div>
+          </div>
+        `;
+      });
+
+      // Rellenar tabla de estadísticas finales
+      const statsBody = document.getElementById('stats-body');
+      statsBody.innerHTML = '';
+      doctors.forEach(d => {
+        statsBody.innerHTML += `
+          <tr>
+            <td><strong>${d.name}</strong></td>
+            <td>${counts[d.id]} días</td>
+            <td>${getDoctorSummaryNote(d.id)}</td>
+          </tr>
+        `;
+      });
+    }
+
+    function getDoctorSummaryNote(docId) {
+      const notes = {
+        cruz: 'Sin martes. Miércoles sale 2pm.',
+        rojas: 'Reunión CCSS 2.º y 4.º jueves.',
+        rodriguez: 'Sin miércoles/viernes. Jueves sale 10am.',
+        sandoval: 'Sin lunes/miércoles. Viernes sale 12md.',
+        meza: 'Sin lunes/miércoles/viernes. Jueves sale 11am.',
+        zuniga: 'Jornada completa sin restricciones.'
+      };
+      return notes[docId] || '';
+    }
+
+    function downloadImage() {
+      const element = document.getElementById('calendar-container');
+      html2canvas(element, { scale: 2 }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Rol_Interconsultas_${document.getElementById('selected-month').value}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
