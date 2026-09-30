@@ -26,7 +26,14 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+    body { 
+      background-color: var(--bg); 
+      color: var(--text); 
+      padding: 1.5rem; 
+      padding-bottom: 15rem; /* Espacio extra para desplegables de fechas */
+      max-width: 1400px; 
+      margin: 0 auto; 
+    }
 
     header {
       background: linear-gradient(135deg, #0284c7, #0f172a);
@@ -36,12 +43,14 @@
     header h1 { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
     header p { font-size: 0.9rem; opacity: 0.9; margin-top: 0.25rem; }
 
-    .grid-layout { display: grid; grid-template-columns: 380px 1fr; gap: 1.5rem; }
+    .grid-layout { display: grid; grid-template-columns: 380px 1fr; gap: 1.5rem; align-items: start; }
     @media (max-width: 1024px) { .grid-layout { grid-template-columns: 1fr; } }
+
+    .controls { display: flex; flex-direction: column; gap: 1.25rem; }
 
     .card {
       background: var(--card-bg); border: 1px solid var(--border);
-      border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.25rem;
+      border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     .card h2 { font-size: 1.05rem; margin-bottom: 1rem; color: var(--secondary); display: flex; align-items: center; gap: 0.5rem; }
 
@@ -288,7 +297,6 @@
   <script>
     let currentDateObj = new Date();
 
-    // Horarios corregidos según requerimientos exactos
     let doctors = [
       { id: 'cruz', name: 'Dr. Cruz Guzmán', rank: 1, noDays: [2], earlyDay: 3, earlyTime: '14:00', ccss: false },
       { id: 'rojas', name: 'Dr. Rojas Vázquez', rank: 2, noDays: [], earlyDay: null, earlyTime: '', ccss: true },
@@ -502,7 +510,7 @@
       });
     }
 
-    // --- VERIFICACIÓN DE DISPONIBILIDAD Y PENALIZACIÓN DE JORNADA INCOMPLETA ---
+    // --- VERIFICACIÓN DE DISPONIBILIDAD Y PENALIZACIÓN ---
     function getAvailability(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
@@ -525,7 +533,7 @@
         }
       }
 
-      // 4. Salida Temprana / Jornada Incompleta -> Penalización alta (100) para evitar asignarlo si hay alguien de jornada completa
+      // 4. Salida Temprana / Jornada Incompleta
       if(doc.earlyDay === dayOfWeek && doc.earlyTime) {
         return { status: 'LIMITADO', penalty: 100, note: `Sale ${doc.earlyTime}` };
       }
@@ -573,7 +581,7 @@
       let targetQuotas = {};
       doctors.forEach(d => targetQuotas[d.id] = baseQuota);
 
-      // Asignar el residuo (+1 día) a los de menor antigüedad (Rank #6 a #3)
+      // Asignar el residuo (+1 día) a los de menor antigüedad
       for (let i = 0; i < remainder; i++) {
         targetQuotas[docsByRankInverted[i].id] += 1;
       }
@@ -592,7 +600,6 @@
           if (holidayDaysMap[dateStr]) {
             assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
           } else {
-            // Filtrar candidatos disponibles que no han alcanzado su cuota máxima
             let candidates = doctors.map(doc => ({
               doc,
               avail: getAvailability(doc, currentDate),
@@ -600,7 +607,6 @@
               maxQuota: targetQuotas[doc.id]
             })).filter(c => c.avail.status !== 'BLOQUEADO' && c.currentCount < c.maxQuota);
 
-            // Fallback si nadie cumple la regla estricta
             if (candidates.length === 0) {
               candidates = doctors.map(doc => ({
                 doc,
@@ -613,10 +619,6 @@
             if (candidates.length === 0) {
               assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
             } else {
-              // Criterios de ordenación:
-              // 1. Menor penalización por jornada incompleta (Prefiere siempre jornada completa)
-              // 2. Menor cantidad de días asignados acumulados
-              // 3. Antigüedad (Rank menor primero)
               candidates.sort((a, b) => {
                 if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
                 if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
