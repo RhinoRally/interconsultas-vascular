@@ -501,38 +501,29 @@
       });
     }
 
-    // --- DISPONIBILIDAD DE MÉDICOS ---
-    function getAvailability(doc, date) {
+    // --- EVALUACIÓN DE DISPONIBILIDAD ABSOLUTA ---
+    function checkAbsoluteBlock(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
 
-      // 1. Vacaciones/Permisos
-      const isAbsent = absences.some(a => a.docId === doc.id && dateStr >= a.start && dateStr <= a.end);
-      if(isAbsent) return { status: 'BLOQUEADO', penalty: 999, note: 'Vacaciones/Permiso' };
-
-      // 2. Días No Disponibles Fijos
-      if(doc.noDays.includes(dayOfWeek)) {
-        return { status: 'BLOQUEADO', penalty: 999 };
+      // Vacaciones / Permisos
+      if (absences.some(a => a.docId === doc.id && dateStr >= a.start && dateStr <= a.end)) {
+        return true;
       }
-
-      // 3. Reunión CCSS (2.º y 4.º Jueves)
-      if(doc.ccss && dayOfWeek === 4) {
+      // Ausencia fija semanal
+      if (doc.noDays.includes(dayOfWeek)) {
+        return true;
+      }
+      // Reunión CCSS
+      if (doc.ccss && dayOfWeek === 4) {
         const dayOfMonth = date.getDate();
         const thursdayIndex = Math.ceil(dayOfMonth / 7);
-        if(thursdayIndex === 2 || thursdayIndex === 4) {
-          return { status: 'BLOQUEADO', penalty: 999, note: '2.º/4.º Jueves CCSS' };
-        }
+        if (thursdayIndex === 2 || thursdayIndex === 4) return true;
       }
-
-      // 4. Salida Temprana (se le da penalización suave para preferir jornada completa si es posible)
-      if(doc.earlyDay === dayOfWeek && doc.earlyTime) {
-        return { status: 'LIMITADO', penalty: 10, note: `Sale ${doc.earlyTime}` };
-      }
-
-      return { status: 'DISPONIBLE', penalty: 0, note: '' };
+      return false;
     }
 
-    // --- ALGORITMO DE ASIGNACIÓN ESTRICTO BASADO EN ANTIGÜEDAD Y RESIDUO ---
+    // --- ALGORITMO DE DISTRIBUCIÓN MATEMÁTICA GARANTIZADA ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
       if (!monthInput || doctors.length === 0) { return; }
@@ -540,7 +531,7 @@
       const [year, month] = monthInput.split('-').map(Number);
       const lastDay = new Date(year, month, 0);
 
-      // 1. Identificar días laborables reales
+      // 1. Días laborables reales
       let workDays = [];
       let holidayDaysMap = {};
 
@@ -562,19 +553,17 @@
       const totalWorkDays = workDays.length;
       const numDocs = doctors.length;
 
-      // 2. FASE 1: CÁLCULO DE CUOTAS LÍMITE INVIOLABLES
-      // Cuota Base = D / N
-      // Residuo R = D % N (se asigna +1 a los R médicos MENOS antiguos)
+      // 2. CÁLCULO DE CUOTAS MÁXIMAS INVIOLABLES
       const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
       const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
 
-      // Ordenar médicos de MENOR antigüedad a MAYOR antigüedad (Rank #6 a Rank #1)
+      // Ordenar de MENOR antigüedad a MAYOR antigüedad (Rank descender: #6, #5, #4...)
       let docsByRankInverted = [...doctors].sort((a, b) => b.rank - a.rank);
       
       let maxQuotaMap = {};
       doctors.forEach(d => maxQuotaMap[d.id] = baseQuota);
 
-      // Asignar los días extra de residuo estrictamente a los menos antiguos
+      // Repartir el residuo (+1 día) a los de menor antigüedad
       for (let i = 0; i < remainder; i++) {
         maxQuotaMap[docsByRankInverted[i].id] += 1;
       }
@@ -583,7 +572,7 @@
       doctors.forEach(d => counts[d.id] = 0);
       let assignments = [];
 
-      // 3. FASE 2: ASIGNACIÓN DÍA POR DÍA SIN SUPERAR JAMÁS LA CUOTA MÁXIMA
+      // 3. ASIGNACIÓN ESTRICTA DÍA A DÍA
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const currentDate = new Date(year, month - 1, d);
         const dayOfWeek = currentDate.getDay();
@@ -593,32 +582,35 @@
           if (holidayDaysMap[dateStr]) {
             assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
           } else {
-            // Filtrar candidatos que:
-            // a) NO estén bloqueados por vacaciones o restricción fija
-            // b) AÚN NO hayan alcanzado su cuota límite infranqueable
-            let candidates = doctors.map(doc => ({
-              doc,
-              avail: getAvailability(doc, currentDate),
-              currentCount: counts[doc.id],
-              maxQuota: maxQuotaMap[doc.id]
-            })).filter(c => c.avail.status !== 'BLOQUEADO' && c.currentCount < c.maxQuota);
+            // Candidatos que NO tienen bloqueo y NO han alcanzado su tope estricto
+            let eligible = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate) && counts[doc.id] < maxQuotaMap[doc.id]);
 
-            if (candidates.length === 0) {
+            if (eligible.length === 0) {
               assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
             } else {
-              // Orden de prioridad entre candidatos elegibles:
-              // 1. Menor cantidad de días acumulados a la fecha
-              // 2. Menor penalización por horario (prefiere jornada completa)
-              // 3. Menor antigüedad (Rank mayor) para equilibrar la carga laboral
-              candidates.sort((a, b) => {
-                if (a.currentCount !== b.currentCount) return a.currentCount - b.currentCount;
-                if (a.avail.penalty !== b.avail.penalty) return a.avail.penalty - b.avail.penalty;
-                return b.doc.rank - a.doc.rank;
+              // Criterios de ordenación:
+              // 1. Menor número de días asignados hasta el momento
+              // 2. Priorizar jornada completa frente a salida temprana (penalización)
+              // 3. Antigüedad inversa (Rank mayor primero para favorecer carga en menos antiguos)
+              eligible.sort((a, b) => {
+                if (counts[a.id] !== counts[b.id]) return counts[a.id] - counts[b.id];
+                
+                const aEarly = (a.earlyDay === dayOfWeek && a.earlyTime) ? 1 : 0;
+                const bEarly = (b.earlyDay === dayOfWeek && b.earlyTime) ? 1 : 0;
+                if (aEarly !== bEarly) return aEarly - bEarly;
+
+                return b.rank - a.rank;
               });
 
-              const selected = candidates[0];
-              counts[selected.doc.id]++;
-              assignments.push({ date: currentDate, doc: selected.doc, isHoliday: false, note: selected.avail.note });
+              const selected = eligible[0];
+              counts[selected.id]++;
+
+              let noteStr = '';
+              if (selected.earlyDay === dayOfWeek && selected.earlyTime) {
+                noteStr = `Sale ${selected.earlyTime}`;
+              }
+
+              assignments.push({ date: currentDate, doc: selected, isHoliday: false, note: noteStr });
             }
           }
         }
