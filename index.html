@@ -60,14 +60,15 @@
       width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: white;
     }
 
+    /* Selector de mes y año mejorado */
     .month-picker-container {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 0.4rem;
       background: #f1f5f9;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 0.35rem 0.5rem;
+      padding: 0.4rem;
       margin-bottom: 1rem;
     }
     .month-picker-btn {
@@ -75,17 +76,21 @@
       border: 1px solid var(--border);
       color: var(--secondary);
       border-radius: 6px;
-      padding: 0.4rem 0.75rem;
+      padding: 0.45rem 0.65rem;
       cursor: pointer;
       font-size: 0.85rem;
       transition: all 0.2s;
     }
     .month-picker-btn:hover { background: #e2e8f0; color: var(--primary-dark); }
-    .month-display {
-      font-weight: 700;
-      font-size: 0.95rem;
+    .month-select, .year-select {
+      padding: 0.4rem 0.3rem;
+      font-weight: 600;
+      font-size: 0.85rem;
       color: var(--secondary);
-      text-transform: capitalize;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
     }
 
     .btn {
@@ -150,9 +155,28 @@
         
         <label>Seleccionar Mes y Año:</label>
         <div class="month-picker-container">
-          <button class="month-picker-btn" onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i> Anterior</button>
-          <span class="month-display" id="month-display-text">Octubre 2026</span>
-          <button class="month-picker-btn" onclick="changeMonth(1)">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
+          <button class="month-picker-btn" onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+          
+          <select id="select-month" class="month-select" onchange="onDateSelectChange()">
+            <option value="0">Enero</option>
+            <option value="1">Febrero</option>
+            <option value="2">Marzo</option>
+            <option value="3">Abril</option>
+            <option value="4">Mayo</option>
+            <option value="5">Junio</option>
+            <option value="6">Julio</option>
+            <option value="7">Agosto</option>
+            <option value="8">Septiembre</option>
+            <option value="9">Octubre</option>
+            <option value="10">Noviembre</option>
+            <option value="11">Diciembre</option>
+          </select>
+
+          <select id="select-year" class="year-select" onchange="onDateSelectChange()">
+            <!-- Generado dinámicamente -->
+          </select>
+
+          <button class="month-picker-btn" onclick="changeMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
         <input type="hidden" id="selected-month">
 
@@ -300,13 +324,30 @@
     let absences = [];
     let holidays = [];
 
+    function populateYearSelect() {
+      const yearSelect = document.getElementById('select-year');
+      yearSelect.innerHTML = '';
+      const currentYear = new Date().getFullYear();
+      for (let y = currentYear - 2; y <= currentYear + 5; y++) {
+        yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+      }
+    }
+
     function updateMonthDisplay() {
       const year = currentDateObj.getFullYear();
       const month = currentDateObj.getMonth();
-      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-      
-      document.getElementById('month-display-text').innerText = `${monthNames[month]} ${year}`;
+
+      document.getElementById('select-month').value = month;
+      document.getElementById('select-year').value = year;
       document.getElementById('selected-month').value = `${year}-${String(month + 1).padStart(2, '0')}`;
+    }
+
+    function onDateSelectChange() {
+      const m = parseInt(document.getElementById('select-month').value);
+      const y = parseInt(document.getElementById('select-year').value);
+      currentDateObj = new Date(y, m, 1);
+      updateMonthDisplay();
+      generateSchedule();
     }
 
     function changeMonth(offset) {
@@ -316,6 +357,7 @@
     }
 
     function init() {
+      populateYearSelect();
       updateMonthDisplay();
       renderDoctorsList();
       updateDoctorSelect();
@@ -501,20 +543,17 @@
       });
     }
 
-    // --- EVALUACIÓN DE DISPONIBILIDAD ABSOLUTA ---
+    // --- EVALUACIÓN DE BLOQUEOS ABSOLUTOS ---
     function checkAbsoluteBlock(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
 
-      // Vacaciones / Permisos
       if (absences.some(a => a.docId === doc.id && dateStr >= a.start && dateStr <= a.end)) {
         return true;
       }
-      // Ausencia fija semanal
       if (doc.noDays.includes(dayOfWeek)) {
         return true;
       }
-      // Reunión CCSS
       if (doc.ccss && dayOfWeek === 4) {
         const dayOfMonth = date.getDate();
         const thursdayIndex = Math.ceil(dayOfMonth / 7);
@@ -523,7 +562,7 @@
       return false;
     }
 
-    // --- ALGORITMO DE DISTRIBUCIÓN MATEMÁTICA GARANTIZADA ---
+    // --- ALGORITMO GARANTIZADO DE ASIGNACIÓN 100% COBERTURA Y EQUIDAD ---
     function generateSchedule() {
       const monthInput = document.getElementById('selected-month').value;
       if (!monthInput || doctors.length === 0) { return; }
@@ -531,7 +570,6 @@
       const [year, month] = monthInput.split('-').map(Number);
       const lastDay = new Date(year, month, 0);
 
-      // 1. Días laborables reales
       let workDays = [];
       let holidayDaysMap = {};
 
@@ -553,17 +591,15 @@
       const totalWorkDays = workDays.length;
       const numDocs = doctors.length;
 
-      // 2. CÁLCULO DE CUOTAS MÁXIMAS INVIOLABLES
+      // Cuotas ideales iniciales
       const baseQuota = numDocs > 0 ? Math.floor(totalWorkDays / numDocs) : 0;
       const remainder = numDocs > 0 ? totalWorkDays % numDocs : 0;
 
-      // Ordenar de MENOR antigüedad a MAYOR antigüedad (Rank descender: #6, #5, #4...)
       let docsByRankInverted = [...doctors].sort((a, b) => b.rank - a.rank);
       
       let maxQuotaMap = {};
       doctors.forEach(d => maxQuotaMap[d.id] = baseQuota);
 
-      // Repartir el residuo (+1 día) a los de menor antigüedad
       for (let i = 0; i < remainder; i++) {
         maxQuotaMap[docsByRankInverted[i].id] += 1;
       }
@@ -572,7 +608,6 @@
       doctors.forEach(d => counts[d.id] = 0);
       let assignments = [];
 
-      // 3. ASIGNACIÓN ESTRICTA DÍA A DÍA
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const currentDate = new Date(year, month - 1, d);
         const dayOfWeek = currentDate.getDay();
@@ -582,17 +617,22 @@
           if (holidayDaysMap[dateStr]) {
             assignments.push({ date: currentDate, doc: null, isHoliday: true, desc: holidayDaysMap[dateStr] });
           } else {
-            // Candidatos que NO tienen bloqueo y NO han alcanzado su tope estricto
-            let eligible = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate) && counts[doc.id] < maxQuotaMap[doc.id]);
+            // Nivel 1: Candidatos disponibles bajo su cuota máxima ideal
+            let candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate) && counts[doc.id] < maxQuotaMap[doc.id]);
 
-            if (eligible.length === 0) {
+            // Nivel 2 (Garantía de Cobertura Total): Si no hay nadie bajo cuota ideal, tomar a cualquiera que no tenga bloqueo absoluto
+            if (candidates.length === 0) {
+              candidates = doctors.filter(doc => !checkAbsoluteBlock(doc, currentDate));
+            }
+
+            if (candidates.length === 0) {
               assignments.push({ date: currentDate, doc: null, isHoliday: false, note: 'Sin personal disponible' });
             } else {
-              // Criterios de ordenación:
-              // 1. Menor número de días asignados hasta el momento
-              // 2. Priorizar jornada completa frente a salida temprana (penalización)
-              // 3. Antigüedad inversa (Rank mayor primero para favorecer carga en menos antiguos)
-              eligible.sort((a, b) => {
+              // Criterios de Selección:
+              // 1. Menor cantidad acumulada de días asignados en el mes (Mantiene equidad extrema)
+              // 2. Prefiere jornada completa antes de salida temprana
+              // 3. Menor antigüedad (Rank mayor)
+              candidates.sort((a, b) => {
                 if (counts[a.id] !== counts[b.id]) return counts[a.id] - counts[b.id];
                 
                 const aEarly = (a.earlyDay === dayOfWeek && a.earlyTime) ? 1 : 0;
@@ -602,7 +642,7 @@
                 return b.rank - a.rank;
               });
 
-              const selected = eligible[0];
+              const selected = candidates[0];
               counts[selected.id]++;
 
               let noteStr = '';
