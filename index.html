@@ -129,7 +129,7 @@
     
     .day-cell { 
       border: 1px solid var(--border); 
-      min-height: 90px; 
+      min-height: 95px; 
       padding: 0.35rem; 
       border-radius: 6px; 
       background: #ffffff; 
@@ -159,6 +159,7 @@
 
     .holiday-tag { background: #fee2e2; color: var(--holiday-text); padding: 0.25rem 0.35rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; border-left: 3px solid var(--danger); }
     .note-tag { font-size: 0.62rem; color: #475569; margin-top: 0.2rem; font-weight: 500; line-height: 1.1; }
+    .warning-tag { font-size: 0.62rem; color: #dc2626; margin-top: 0.2rem; font-weight: 700; line-height: 1.1; background: #fee2e2; padding: 2px 4px; border-radius: 4px; }
 
     .stats-table { width: 100%; margin-top: 1.25rem; border-collapse: collapse; font-size: 0.78rem; }
     .stats-table th, .stats-table td { border: 1px solid var(--border); padding: 0.4rem; text-align: left; }
@@ -343,7 +344,6 @@
   <script>
     let currentDateObj = new Date();
 
-    // Paleta de colores atractiva y diferenciada para cada asistente
     let doctors = [
       { id: 'cruz', name: 'Dr. Cruz Guzmán', rank: 1, color: '#3b82f6', bg: '#eff6ff', border: '#93c5fd', noDays: [2], earlyDay: 3, earlyTime: '14:00', ccss: false },
       { id: 'rojas', name: 'Dr. Rojas Vázquez', rank: 2, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', noDays: [], earlyDay: null, earlyTime: '', ccss: true },
@@ -355,7 +355,7 @@
 
     let absences = [];
     let holidays = [];
-    let currentAssignmentsMap = {}; // Guarda la asignación activa para permitir Drag & Drop manual
+    let currentAssignmentsMap = {};
 
     function populateYearSelect() {
       const yearSelect = document.getElementById('select-year');
@@ -523,7 +523,6 @@
 
       const existingIndex = doctors.findIndex(d => d.id === id);
       
-      // Color semitransparente claro para fondo
       const bg = color + '15'; 
       const border = color + '60';
 
@@ -585,23 +584,27 @@
       });
     }
 
-    // --- EVALUACIÓN DE BLOQUEOS ABSOLUTOS ---
-    function checkAbsoluteBlock(doc, date) {
+    // --- EVALUACIÓN DE BLOQUEOS ABSOLUTOS Y MOTIVOS ---
+    function getConflictReason(doc, date) {
       const dayOfWeek = date.getDay(); // 1: Lun, ... 5: Vie
       const dateStr = date.toISOString().split('T')[0];
 
       if (absences.some(a => a.docId === doc.id && dateStr >= a.start && dateStr <= a.end)) {
-        return true;
+        return "⚠️ En vacaciones/permiso";
       }
       if (doc.noDays.includes(dayOfWeek)) {
-        return true;
+        return "⚠️ Día no laboral";
       }
       if (doc.ccss && dayOfWeek === 4) {
         const dayOfMonth = date.getDate();
         const thursdayIndex = Math.ceil(dayOfMonth / 7);
-        if (thursdayIndex === 2 || thursdayIndex === 4) return true;
+        if (thursdayIndex === 2 || thursdayIndex === 4) return "⚠️ Reunión CCSS";
       }
-      return false;
+      return null;
+    }
+
+    function checkAbsoluteBlock(doc, date) {
+      return getConflictReason(doc, date) !== null;
     }
 
     // --- ALGORITMO DE DISTRIBUCIÓN MATEMÁTICO ---
@@ -738,6 +741,9 @@
                 noteStr = `Sale ${doc.earlyTime}`;
               }
 
+              // Verificación de conflicto por reacomodo manual
+              const conflictReason = getConflictReason(doc, currentDate);
+
               grid.innerHTML += `
                 <div class="day-cell" data-date="${dateStr}" ondragover="allowDrop(event)" ondragleave="removeDragOver(event)" ondrop="drop(event)">
                   <div class="day-number">${d}</div>
@@ -749,6 +755,7 @@
                        style="background-color: ${doc.bg || '#e0f2fe'}; color: ${doc.color}; border: 1px solid ${doc.border || '#93c5fd'};">
                     <i class="fa-solid fa-grip-vertical" style="opacity: 0.5; margin-right: 2px;"></i> ${doc.name}
                     ${noteStr ? `<div class="note-tag" style="color:${doc.color};"><i class="fa-solid fa-clock"></i> ${noteStr}</div>` : ''}
+                    ${conflictReason ? `<div class="warning-tag"><i class="fa-solid fa-triangle-exclamation"></i> ${conflictReason}</div>` : ''}
                   </div>
                 </div>
               `;
